@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTC RSI Monitor - Live Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .dashboard {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .status-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.active {
+            background: #00ff00;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .live-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            color: white;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-start {
+            background: #00ff00;
+            color: #333;
+        }
+        
+        .btn-start:hover:not(:disabled) {
+            background: #00dd00;
+            transform: translateY(-2px);
+        }
+        
+        .btn-stop {
+            background: #ff4444;
+            color: white;
+        }
+        
+        .btn-stop:hover:not(:disabled) {
+            background: #dd0000;
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .metrics {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .metric-card.updating::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+            animation: shimmer 1.5s infinite;
+        }
+        
+        @keyframes shimmer {
+            100% { left: 100%; }
+        }
+        
+        .metric-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .metric-value.price {
+            color: #2ecc71;
+        }
+        
+        .metric-value.rsi {
+            color: #3498db;
+        }
+        
+        .metric-value.rsi.overbought {
+            color: #e74c3c;
+            animation: alertPulse 1s infinite;
+        }
+        
+        .metric-value.rsi.oversold {
+            color: #2ecc71;
+            animation: alertPulse 1s infinite;
+        }
+        
+        @keyframes alertPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .config {
+            padding: 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .config h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .config-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        
+        .config-item label {
+            display: block;
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .config-item .value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .interval-controls {
+            padding: 30px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .interval-controls h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .interval-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .interval-btn {
+            padding: 10px 20px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .interval-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .interval-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .telegram-info {
+            padding: 20px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .telegram-info h4 {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        
+        .telegram-info p {
+            margin: 5px 0;
+            opacity: 0.9;
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            opacity: 0.8;
+        }
+        
+        .update-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #00ff00;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+            margin-left: 5px;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+            }
+            
+            .metrics {
+                grid-template-columns: 1fr;
+            }
+            
+            .interval-buttons {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 BTC RSI Monitor - Live Dashboard</h1>
+            <p>Real-time Bitcoin RSI monitoring with Telegram alerts • Updates every 5 seconds</p>
+        </div>
+        
+        <div class="dashboard">
+            <div class="status-bar">
+                <div class="status-left">
+                    <div class="status-indicator">
+                        <div class="status-dot" id="statusDot"></div>
+                        <span id="statusText">Loading...</span>
+                    </div>
+                    <div class="live-badge">
+                        🔴 LIVE<span class="update-indicator"></span>
+                    </div>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-start" id="btnStart" onclick="startMonitor()">▶ Start</button>
+                    <button class="btn btn-stop" id="btnStop" onclick="stopMonitor()" disabled>⏹ Stop</button>
+                </div>
+            </div>
+            
+            <div class="metrics">
+                <div class="metric-card" id="priceCard">
+                    <div class="metric-label">💰 Current Price (Live)</div>
+                    <div class="metric-value price" id="price">$0.00</div>
+                </div>
+                
+                <div class="metric-card" id="rsiCard">
+                    <div class="metric-label">📊 RSI (14) - Live</div>
+                    <div class="metric-value rsi" id="rsi">0.00</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">🔔 Alerts Sent</div>
+                    <div class="metric-value" id="alerts">0</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">⏱️ Runtime</div>
+                    <div class="metric-value" id="runtime">0h 0m</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">🕐 Last Update (IST)</div>
+                    <div class="metric-value" id="lastUpdate" style="font-size: 1.2em;">Never</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">🔄 Check Frequency</div>
+                    <div class="metric-value" id="checkFreq" style="font-size: 1.5em;">Every 5s</div>
+                </div>
+            </div>
+            
+            <div class="interval-controls">
+                <h3>⏱️ Change Time Interval</h3>
+                <div class="interval-buttons">
+                    <button class="interval-btn" onclick="changeInterval('1m')">1 Minute</button>
+                    <button class="interval-btn" onclick="changeInterval('3m')">3 Minutes</button>
+                    <button class="interval-btn" onclick="changeInterval('5m')">5 Minutes</button>
+                    <button class="interval-btn" onclick="changeInterval('15m')">15 Minutes</button>
+                    <button class="interval-btn" onclick="changeInterval('30m')">30 Minutes</button>
+                    <button class="interval-btn active" onclick="changeInterval('1h')">1 Hour</button>
+                    <button class="interval-btn" onclick="changeInterval('2h')">2 Hours</button>
+                    <button class="interval-btn" onclick="changeInterval('4h')">4 Hours</button>
+                    <button class="interval-btn" onclick="changeInterval('1d')">1 Day</button>
+                </div>
+            </div>
+            
+            <div class="config">
+                <h3>⚙️ Current Configuration</h3>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label>Symbol</label>
+                        <div class="value" id="symbol">-</div>
+                    </div>
+                    <div class="config-item">
+                        <label>Current Interval</label>
+                        <div class="value" id="interval">-</div>
+                    </div>
+                    <div class="config-item">
+                        <label>Overbought Threshold</label>
+                        <div class="value" id="upperThreshold">-</div>
+                    </div>
+                    <div class="config-item">
+                        <label>Oversold Threshold</label>
+                        <div class="value" id="lowerThreshold">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="telegram-info">
+                <h4>📱 Telegram Bot Commands</h4>
+                <p><strong>/status</strong> - Get current price and RSI</p>
+                <p><strong>/interval 15m</strong> - Change interval (1m, 5m, 15m, 1h, 4h, 1d)</p>
+                <p><strong>/threshold 65 35</strong> - Change RSI alert thresholds</p>
+                <p><strong>/help</strong> - Show all available commands</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>🚀 Hosted on PythonAnywhere | Auto-refreshes every 5 seconds | IST Timezone</p>
+        </div>
+    </div>
+    
+    <script>
+        let currentInterval = '1h';
+        
+        function formatRuntime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${hours}h ${minutes}m`;
+        }
+        
+        function updateIntervalButtons() {
+            document.querySelectorAll('.interval-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            const activeBtn = Array.from(document.querySelectorAll('.interval-btn')).find(
+                btn => btn.textContent.toLowerCase().includes(currentInterval.replace(/[hmd]/g, ''))
+            );
+            
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+        }
+        
+        function updateStatus() {
+            // Add updating animation
+            document.getElementById('priceCard').classList.add('updating');
+            document.getElementById('rsiCard').classList.add('updating');
+            
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    // Remove updating animation
+                    setTimeout(() => {
+                        document.getElementById('priceCard').classList.remove('updating');
+                        document.getElementById('rsiCard').classList.remove('updating');
+                    }, 500);
+                    
+                    // Update status indicator
+                    const statusDot = document.getElementById('statusDot');
+                    const statusText = document.getElementById('statusText');
+                    const btnStart = document.getElementById('btnStart');
+                    const btnStop = document.getElementById('btnStop');
+                    
+                    if (data.running) {
+                        statusDot.classList.add('active');
+                        statusText.textContent = 'Active Monitoring';
+                        btnStart.disabled = true;
+                        btnStop.disabled = false;
+                    } else {
+                        statusDot.classList.remove('active');
+                        statusText.textContent = 'Stopped';
+                        btnStart.disabled = false;
+                        btnStop.disabled = true;
+                    }
+                    
+                    // Update metrics with animation
+                    document.getElementById('price').textContent = `$${data.current_price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                    
+                    const rsiElement = document.getElementById('rsi');
+                    rsiElement.textContent = data.current_rsi.toFixed(2);
+                    rsiElement.classList.remove('overbought', 'oversold');
+                    if (data.current_rsi > data.rsi_upper) {
+                        rsiElement.classList.add('overbought');
+                    } else if (data.current_rsi < data.rsi_lower) {
+                        rsiElement.classList.add('oversold');
+                    }
+                    
+                    document.getElementById('alerts').textContent = data.alerts_count;
+                    document.getElementById('runtime').textContent = formatRuntime(data.runtime);
+                    document.getElementById('lastUpdate').textContent = data.last_update || 'Never';
+                    document.getElementById('checkFreq').textContent = `Every ${data.check_frequency}s`;
+                    
+                    // Update config
+                    document.getElementById('symbol').textContent = data.symbol;
+                    document.getElementById('interval').textContent = data.interval.toUpperCase();
+                    document.getElementById('upperThreshold').textContent = `> ${data.rsi_upper}`;
+                    document.getElementById('lowerThreshold').textContent = `< ${data.rsi_lower}`;
+                    
+                    // Update current interval and buttons
+                    if (data.interval !== currentInterval) {
+                        currentInterval = data.interval;
+                        updateIntervalButtons();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching status:', error);
+                    document.getElementById('priceCard').classList.remove('updating');
+                    document.getElementById('rsiCard').classList.remove('updating');
+                });
+        }
+        
+        function startMonitor() {
+            fetch('/start')
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    updateStatus();
+                })
+                .catch(error => console.error('Error starting monitor:', error));
+        }
+        
+        function stopMonitor() {
+            if (confirm('Are you sure you want to stop monitoring?')) {
+                fetch('/stop')
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                        updateStatus();
+                    })
+                    .catch(error => console.error('Error stopping monitor:', error));
+            }
+        }
+        
+        function changeInterval(interval) {
+            fetch('/change-interval', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ interval: interval })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentInterval = interval;
+                    updateIntervalButtons();
+                    alert(`✅ Interval changed to ${interval.toUpperCase()}`);
+                    updateStatus();
+                } else {
+                    alert(`❌ ${data.message}`);
+                }
+            })
+            .catch(error => console.error('Error changing interval:', error));
+        }
+        
+        // Initial update
+        updateStatus();
+        
+        // Auto-refresh every 5 seconds to match monitoring frequency
+        setInterval(updateStatus, 5000);
+        
+        // Initialize interval buttons
+        updateIntervalButtons();
+    </script>
+</body>
+</html>
